@@ -1,5 +1,5 @@
 -- (Creator = Thanh Phuc)
--- 💟 Thanh Phuc - Chroma Boombox Đeo Chéo: Giật Cầu Vồng Theo Nhịp Nhạc (Bất Tử Khi Die) 💟
+-- 💟 Thanh Phuc - Balo Chéo Cầu Vồng Giật Theo Nhạc + Nút Bật/Tắt Linh Hoạt 💟
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -12,86 +12,87 @@ LocalSound.Parent = LocalPlayer:WaitForChild("PlayerWorkspace", 5) or workspace
 LocalSound.Volume = 2
 LocalSound.Looped = true
 
-local CurrentPart = nil
-local CurrentMesh = nil
+local FakeBoombox = nil
+local RainbowConnection = nil
 
--- Hàm tạo Loa Đeo Chéo chuẩn hình mẫu
-local function CreateChromaBoombox()
-    if CurrentPart then CurrentPart:Destroy() end
+-- Hàm xóa sạch loa cũ
+local function RemoveBoombox()
+    if RainbowConnection then RainbowConnection:Disconnect() RainbowConnection = nil end
+    if FakeBoombox then FakeBoombox:Destroy() FakeBoombox = nil end
+end
+
+-- Hàm tạo Balo Chéo Cầu Vồng (Dựa theo cách hoạt động của khối vuông đầu tiên để đảm bảo 100% hiện)
+local function CreateFakeBoombox()
+    RemoveBoombox()
     
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("UpperTorso") and not character:FindFirstChild("Torso") then return end
     local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
     
+    -- Tạo Part cơ sở cho chiếc balo dẹp gọn
     local part = Instance.new("Part")
-    part.Name = "ThanhPhucChromaBackpack"
-    part.Size = Vector3.new(1, 1, 1)
+    part.Name = "ThanhPhucChromaBag"
+    part.Size = Vector3.new(1.8, 1.2, 0.4) -- Kích thước dẹp gọn chuẩn dáng cặp chéo
     part.CanCollide = false
     part.Massless = true
     
-    -- Dùng Mesh Chroma Boombox xịn của Roblox (Dáng dẹp, rõ nét màng loa)
+    -- Dùng lưới Mesh của Chroma Boombox gốc để lấy chi tiết màng loa sắc nét
     local mesh = Instance.new("SpecialMesh", part)
     mesh.MeshId = "rbxassetid://212641536"
     mesh.TextureId = "rbxassetid://212641550"
     mesh.Scale = Vector3.new(1.1, 1.1, 1.1)
     
-    CurrentPart = part
-    CurrentMesh = mesh
+    FakeBoombox = part
     part.Parent = character
     
-    -- Weld giữ chặt đeo xéo như cặp quai chéo
+    -- Gắn chặt và xoay nghiêng tạo dáng quai chéo sau lưng
     local weld = Instance.new("Weld")
     weld.Part0 = torso
     weld.Part1 = part
-    weld.C0 = CFrame.new(0, -0.2, 0.6) * CFrame.Angles(0, math.rad(180), math.rad(25)) -- Nghiêng xéo góc quai đeo
+    weld.C0 = CFrame.new(0, -0.2, 0.6) * CFrame.Angles(0, math.rad(180), math.rad(25)) -- Xoay nghiêng 25 độ quai chéo
     weld.Parent = part
+    
+    -- Xử lý hiệu ứng cầu vồng chớp nháy mạnh/nhẹ và co giãn theo nhịp Bass (Loudness)
+    local hue = 0
+    RainbowConnection = RunService.RenderStepped:Connect(function()
+        if part and part.Parent and mesh then
+            hue = (hue + 1.5) % 360
+            local baseColor = Color3.fromHSV(hue/360, 1, 1)
+            
+            -- Lấy độ lớn âm thanh thực tế
+            local loudness = LocalSound.PlaybackLoudness
+            local intensity = math.clamp(loudness / 280, 0.4, 2.5) -- Đập nháy theo tiếng Bass
+            
+            -- Màu sắc chớp nháy đồng bộ theo nhịp hát/nhạc
+            local dynamicColor = Color3.new(
+                math.clamp(baseColor.R * intensity, 0, 1),
+                math.clamp(baseColor.G * intensity, 0, 1),
+                math.clamp(baseColor.B * intensity, 0, 1)
+            )
+            part.Color = dynamicColor
+            mesh.VertexColor = Vector3.new(dynamicColor.R, dynamicColor.G, dynamicColor.B)
+            
+            -- Hiệu ứng giật nhẹ độ lớn của balo theo tiếng Bass đập
+            local scaleMultiplier = 1.1 + (math.clamp(loudness / 900, 0, 0.15))
+            mesh.Scale = Vector3.new(scaleMultiplier, scaleMultiplier, scaleMultiplier)
+        else
+            RemoveBoombox()
+        end
+    end)
 end
 
--- Vừa bật Script là loa xuất hiện ngay lập tức
-if LocalPlayer.Character then
-    CreateChromaBoombox()
-end
-
--- Tự động đeo lại ngay khi nhân vật hồi sinh (Bất tử khi die)
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    CreateChromaBoombox()
+-- Tự động dọn dẹp âm thanh và loa cũ khi bạn nhân vật die
+LocalPlayer.CharacterRemoving:Connect(function()
+    RemoveBoombox()
+    LocalSound:Stop()
 end)
 
--- VÒNG LẶP XỬ LÝ HIỆU ỨNG CẦU VỒNG + CHỚP GIẬT THEO NHỊP BASS
-local hue = 0
-RunService.RenderStepped:Connect(function()
-    if CurrentPart hills and CurrentPart.Parent and CurrentMesh then
-        -- Chạy màu cầu vồng liên tục
-        hue = (hue + 1.5) % 360
-        local baseColor = Color3.fromHSV(hue/360, 1, 1)
-        
-        -- Lấy độ lớn của âm thanh hiện tại (Nhịp Bass / Tiếng hát)
-        local loudness = LocalSound.PlaybackLoudness
-        local intensity = math.clamp(loudness / 300, 0.3, 2.5) -- Giới hạn độ chớp giật phù hợp
-        
-        -- Cho màu sắc chớp nháy (nhạt/đậm hoặc sáng rực) theo nhịp nhạc
-        local dynamicColor = Color3.new(
-            math.clamp(baseColor.R * intensity, 0, 1),
-            math.clamp(baseColor.G * intensity, 0, 1),
-            math.clamp(baseColor.B * intensity, 0, 1)
-        )
-        
-        CurrentPart.Color = dynamicColor
-        CurrentMesh.VertexColor = Vector3.new(dynamicColor.R, dynamicColor.G, dynamicColor.B)
-        
-        -- Tạo hiệu ứng loa giật nhẹ (co giãn) nhẹ nhàng theo nhịp đập của nhạc
-        local scaleMultiplier = 1.1 + (math.clamp(loudness / 1000, 0, 0.15))
-        CurrentMesh.Scale = Vector3.new(scaleMultiplier, scaleMultiplier, scaleMultiplier)
-    end
-end)
-
--- TẠO GIAO DIỆN GUI (Giữ nguyên giao diện di chuyển linh hoạt)
+-- TẠO GIAO DIỆN GUI (Thay đổi kích thước để chứa thêm nút Tắt)
 local ScreenGui = Instance.new("ScreenGui", PlayerGui)
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 250, 0, 220)
+MainFrame.Size = UDim2.new(0, 250, 0, 240) -- Tăng nhẹ chiều cao để giao diện thoáng hơn
 MainFrame.Position = UDim2.new(0.5, -125, 0.4, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.Draggable = true
@@ -110,7 +111,7 @@ HideBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false 
 end)
 
--- Nút MỞ MENU (Kéo rê tự do tránh vướng màn hình)
+-- Nút MỞ MENU (Kéo rê tự do)
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 50, 0, 50)
 OpenBtn.Position = UDim2.new(0, 10, 0.5, 0)
@@ -144,22 +145,41 @@ Instance.new("UICorner", InputBox)
 
 -- Nút PHÁT NHẠC
 local PlayBtn = Instance.new("TextButton", MainFrame)
-PlayBtn.Size = UDim2.new(0.9, 0, 0, 40)
+PlayBtn.Size = UDim2.new(0.42, 0, 0, 40) -- Chia đôi chiều ngang cho nút Phát
 PlayBtn.Position = UDim2.new(0.05, 0, 0.55, 0)
-PlayBtn.Text = "PHÁT NHẠC"
+PlayBtn.Text = "PHÁT"
 PlayBtn.TextColor3 = Color3.new(1, 1, 1)
 PlayBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 Instance.new("UICorner", PlayBtn)
 
--- Sự kiện click nút Phát nhạc
+-- Nút TẮT NHẠC (Tiện lợi để dừng nhạc và dọn dẹp loa)
+local StopBtn = Instance.new("TextButton", MainFrame)
+StopBtn.Size = UDim2.new(0.42, 0, 0, 40) -- Nút Tắt nằm đối xứng kế bên
+StopBtn.Position = UDim2.new(0.53, 0, 0.55, 0)
+StopBtn.Text = "TẮT"
+StopBtn.TextColor3 = Color3.new(1, 1, 1)
+StopBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+Instance.new("UICorner", StopBtn)
+
+-- Sự kiện nhấn nút PHÁT NHẠC
 PlayBtn.MouseButton1Click:Connect(function()
     local cleanID = InputBox.Text:match("%d+")
     if cleanID then
         LocalSound.SoundId = "rbxassetid://" .. cleanID
         LocalSound:Play()
-        print("Thanh Phuc đang quẩy nhạc nhịp Bass!")
+        
+        -- Gọi tạo balo đeo chéo chớp nháy đồng hành cùng nhạc
+        CreateFakeBoombox()
+        print("Thanh Phuc đang quẩy nhạc + Đeo balo chéo Chroma!")
     else
         InputBox.Text = ""
         InputBox.PlaceholderText = "ID không hợp lệ!"
     end
+end)
+
+-- Sự kiện nhấn nút TẮT NHẠC
+StopBtn.MouseButton1Click:Connect(function()
+    LocalSound:Stop() -- Tắt tiếng nhạc hoàn toàn
+    RemoveBoombox()   -- Xóa chiếc balo quai chéo đi gọn gàng
+    print("Thanh Phuc đã dừng nhạc.")
 end)
